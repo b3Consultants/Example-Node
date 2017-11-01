@@ -1,34 +1,40 @@
-var express = require('express');
-var app = express();
-var path = require('path');
-var bodyParser = require('body-parser');
+'use strict';
 
-var timeController = require('./controllers/time');
-var homeController = require('./controllers/home');
+const http = require('http');
+const express = require('express');
+const mongoose = require('mongoose');
+const database = require('./config/database'); // load the database config
+const morgan = require('morgan');
+const bodyParser = require('body-parser');
+const Miniponic = require('./app/index');
+const Data = require('./app/routes/data.js');
 
-app.use(express.static(__dirname + '/public'));
+const port = 8081;
+
+const app = express();
+
+mongoose.connect(database.localUrl);
+app.use(morgan('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
+app.use(bodyParser.urlencoded({ extended: false }));
 
-app.set('views', path.join(__dirname, 'views'));
-app.get('/', homeController.index, timeController.getDate);
-app.set('view engine', 'jade');
-
-app.post('/catch', function(request, response){
-  var body = request.body;
-  console.log("Received: ", body);
-  response.sendStatus(200);
+app.get('/metrics', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(metrics.metrics.getAll(req.query.reset));
 });
 
-app.use(function(req, res, next) {
-    var err = new Error('Not Found');
-    err.status = 404;
-    next(err);
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
 });
 
-var server = app.listen(3000, function (){
-  var port = server.address().port;
-  console.log('Magic is happening on port', port, " at ", timeController.getDate());
+const server = http.createServer(app);
+
+app.use('/', Miniponic);
+app.use('/data', Data);
+
+server.listen(port, () => {
+  /* eslint-disable no-console */
+  console.log(`Miniponic App rocking the shit out of you on port ${port}!`);
 });
